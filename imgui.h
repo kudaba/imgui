@@ -119,6 +119,7 @@ struct ImGuiStorage;                // Helper for key->value storage
 struct ImGuiStyle;                  // Runtime data for styling/colors
 struct ImGuiTextBuffer;             // Helper to hold and append into a text buffer (~string builder)
 struct ImGuiTextFilter;             // Helper to parse and apply text filters (e.g. "aaaaa[,bbbb][,ccccc]")
+struct ImGuiTextFilterMatch;        // Helper for ImGuiTextFilter to allow parsing of multiple string field with a single filter
 struct ImGuiViewport;               // Viewport (generally ~1 per window to output to at the OS level. Need per-platform support to use multiple viewports)
 struct ImGuiWindowClass;            // Window class (rare/advanced uses: provide hints to the platform back-end via altered viewport flags and parent/child info)
 
@@ -137,6 +138,8 @@ typedef int ImGuiKey;               // -> enum ImGuiKey_             // Enum: A 
 typedef int ImGuiNavInput;          // -> enum ImGuiNavInput_        // Enum: An input identifier for navigation
 typedef int ImGuiMouseCursor;       // -> enum ImGuiMouseCursor_     // Enum: A mouse cursor identifier
 typedef int ImGuiStyleVar;          // -> enum ImGuiStyleVar_        // Enum: A variable identifier for styling
+typedef int ImGuiTextFilterMode;    // -> enum ImGuiTextFilterMode_  // Enum: To control how text filter handles multiple words
+typedef int ImGuiTextFilterMatchResult; // -> enum ImGuiTextFilterMatchResult_  // Enum: A match identifier to better control applying a text filter over multiple fields
 typedef int ImDrawCornerFlags;      // -> enum ImDrawCornerFlags_    // Flags: for ImDrawList::AddRect*() etc.
 typedef int ImDrawListFlags;        // -> enum ImDrawListFlags_      // Flags: for ImDrawList
 typedef int ImFontAtlasFlags;       // -> enum ImFontAtlasFlags_     // Flags: for ImFontAtlas
@@ -1677,6 +1680,12 @@ struct ImGuiOnceUponAFrame
 #define IMGUI_ONCE_UPON_A_FRAME     static ImGuiOnceUponAFrame imgui_oaf; if (imgui_oaf)    // OBSOLETED in 1.51, will remove!
 #endif
 
+enum ImGuiTextFilterMode_
+{
+    ImGuiTextFilterMode_Or,     // A single word match will pass the filter
+    ImGuiTextFilterMode_And     // All words must match to pass the filter
+};
+
 // Helper: Parse and apply text filters. In format "aaaaa[,bbbb][,ccccc]"
 struct ImGuiTextFilter
 {
@@ -1698,11 +1707,46 @@ struct ImGuiTextFilter
         const char*     begin() const   { return b; }
         const char*     end () const    { return e; }
         bool            empty() const   { return b == e; }
-        IMGUI_API void  split(char separator, ImVector<TextRange>* out) const;
+        IMGUI_API void  split(char separator, ImVector<TextRange>* out, char minWordSize = 0) const;
     };
     char                InputBuf[256];
     ImVector<TextRange> Filters;
-    int                 CountGrep;
+    int                 NegativeFilterCount;
+
+    // [Configuration]
+    ImGuiTextFilterMode MatchMode;      // if true then all words must match, otherwise any matching word will be a pass
+    char                WordSplitter;   // Character used to split user string, ',' by default
+    char                MinWordSize;    // Minimum number of characters before a word is used for matching, can help improve UX by avoiding mass matching against 1 or 2 characters
+};
+
+enum ImGuiTextFilterMatchResult_
+{
+    ImGuiTextFilterMatchResultNone,     // There have been no matches or failures
+    ImGuiTextFilterMatchResultFail,     // The match explicitly failed because of a subtractive clause or because no positive matches passed
+    ImGuiTextFilterMatchResultPass,     // The match explicitly passed because of positive match
+};
+
+// Helper: Extend a single ImGuiTextFilter to multiple fields. It tracks explicit pass/failure conditions and will 
+// stop processing text after an explicit failure.
+// Usage:
+//     ImGuiTextFilterMatch match(filter);
+//     match.PassFilter(partial_text_to_match1);
+//     match.PassFilter(partial_text_to_match2);
+//     if (match) { ... }
+struct ImGuiTextFilterMatch
+{
+    ImGuiTextFilterMatch(const ImGuiTextFilter& filter);
+
+    IMGUI_API void      PassFilter(const char* text, const char* text_end = NULL);
+
+    operator bool() const { return State == ImGuiTextFilterMatchResultPass; }
+
+    // [Internal]
+    const ImGuiTextFilter& Filter;
+    ImGuiTextFilterMatchResult State;
+    ImU64 MatchStates;  // track which positive matches have been seen for And mode
+    int MatchCount;
+    int MatchMask;
 };
 
 // Helper: Growable text buffer for logging/accumulating text
