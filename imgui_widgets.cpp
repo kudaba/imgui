@@ -3538,7 +3538,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         // Win32 and GLFW naturally do it but not SDL.
         const bool ignore_char_inputs = (io.KeyCtrl && !io.KeyAlt) || (is_osx && io.KeySuper);
         if ((flags & ImGuiInputTextFlags_AllowTabInput) && IsKeyPressedMap(ImGuiKey_Tab) && !ignore_char_inputs && !io.KeyShift && !is_readonly)
-            if (!io.InputQueueCharacters.contains('\t'))
+            if (!io.InputCurrentFrame->InputQueueCharacters.contains('\t'))
             {
                 unsigned int c = '\t'; // Insert TAB
                 if (InputTextFilterCharacter(&c, flags, callback, callback_user_data))
@@ -3547,13 +3547,13 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
 
         // Process regular text input (before we check for Return because using some IME will effectively send a Return?)
         // We ignore CTRL inputs, but need to allow ALT+CTRL as some keyboards (e.g. German) use AltGR (which _is_ Alt+Ctrl) to input certain characters.
-        if (io.InputQueueCharacters.Size > 0)
+        if (io.InputCurrentFrame->InputQueueCharacters.Size > 0)
         {
             if (!ignore_char_inputs && !is_readonly && !user_nav_input_start)
-                for (int n = 0; n < io.InputQueueCharacters.Size; n++)
+                for (int n = 0; n < io.InputCurrentFrame->InputQueueCharacters.Size; n++)
                 {
                     // Insert character if they pass filtering
-                    unsigned int c = (unsigned int)io.InputQueueCharacters[n];
+                    unsigned int c = (unsigned int)io.InputCurrentFrame->InputQueueCharacters[n];
                     if (c == '\t' && io.KeyShift)
                         continue;
                     if (InputTextFilterCharacter(&c, flags, callback, callback_user_data))
@@ -3561,7 +3561,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
                 }
 
             // Consume characters
-            io.InputQueueCharacters.resize(0);
+            io.InputCurrentFrame->InputQueueCharacters.resize(0);
         }
     }
 
