@@ -22,6 +22,157 @@ void CreateRenderTarget();
 void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+bool show_demo_window = true;
+bool show_another_window = false;
+bool show_simple_window = true;
+
+float main_menu_height;
+
+static void locSetupMainDockspace()
+{
+    // setup dockspace 
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 pos = ImVec2(viewport->Pos.x, viewport->Pos.y + main_menu_height);
+    ImVec2 size = ImVec2(viewport->Size.x, viewport->Size.y - main_menu_height);
+
+    ImGui::SetNextWindowPos(pos);
+    ImGui::SetNextWindowSize(size);
+    ImGui::SetNextWindowViewport(viewport->ID);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+
+    ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDocking;
+    windowFlags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
+    windowFlags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
+
+    ImGui::Begin("MainDockSpace", nullptr, windowFlags);
+    ImGui::PopStyleVar(3);
+
+    ImGui::DockSpace(ImGui::GetID("MainDockSpace"));
+
+    ImGui::End();
+}
+
+int next_settings = -1;
+static bool settings_window = false;
+static bool properties_window = false;
+static bool canvas_window = false;
+static bool other_window = false;
+
+#include <string>
+#include <regex>
+void docking_crash_example()
+{
+    locSetupMainDockspace();
+
+    if (ImGui::BeginMainMenuBar())
+    {
+        main_menu_height = ImGui::GetWindowHeight();
+
+        if (ImGui::BeginMenu("Windows"))
+        {
+            if (ImGui::MenuItem("Settings", NULL, &settings_window))
+                settings_window = true;
+
+            if (ImGui::MenuItem("Properties", NULL, &properties_window))
+                properties_window = true;
+
+            if (ImGui::MenuItem("Canvas", NULL, &canvas_window))
+                canvas_window = true;
+
+            if (ImGui::MenuItem("Some Other Window", NULL, &other_window))
+                other_window = true;
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("Layouts"))
+        {
+            if (ImGui::MenuItem("Layout 1"))
+            {
+                next_settings = 0;
+            }
+            if (ImGui::MenuItem("Layout 2"))
+            {
+                next_settings = 1;
+            }
+            if (ImGui::MenuItem("Copy Current Layout"))
+            {
+                std::string copy = std::regex_replace(ImGui::SaveIniSettingsToMemory(), std::regex("\t"), "\\t");
+                copy = std::regex_replace(copy, std::regex("\n"), "\\n");
+                ImGui::SetClipboardText(copy.c_str());
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+
+    if (settings_window)
+    {
+        if (ImGui::Begin("Settings", &settings_window))
+        {
+            size_t size;
+            char const* settings = ImGui::SaveIniSettingsToMemory(&size);
+            ImGui::InputTextMultiline("Ini", (char*)settings, size, { 0,0 }, ImGuiInputTextFlags_ReadOnly);
+        }
+        ImGui::End();
+    }
+
+    if (properties_window)
+    {
+        if (ImGui::Begin("Properties", &properties_window))
+            ImGui::TextUnformatted("Pretend there's a bunch of properties here");
+        ImGui::End();
+    }
+
+    if (canvas_window)
+    {
+        if (ImGui::Begin("Canvas", &canvas_window))
+            ImGui::TextUnformatted("Imagine a beautifal drawing canvas");
+        ImGui::End();
+    }
+
+    if (other_window)
+    {
+        if (ImGui::Begin("Other", &other_window))
+            ImGui::TextUnformatted("That's it, I'm out of ideas");
+        ImGui::End();
+    }
+}
+
+void apply_settings()
+{
+    if (next_settings != -1)
+    {
+        static char const* layout_1 = "[Window][Debug##Default]\nPos=60,60\nSize=400,400\nCollapsed=0\n\n[Window][Hello, world!]\nPos=163,257\nSize=890,338\nCollapsed=0\nDockId=0xC3C5E3D9,0\n\n[Window][Dear ImGui Demo]\nPos=628,44\nSize=550,680\nCollapsed=0\n\n[Window][Settings]\nPos=0,25\nSize=1258,718\nCollapsed=0\nDockId=0xC3C5E3D9,0\n\n[Window][Another Window]\nPos=60,60\nSize=289,89\nCollapsed=0\n\n[Window][MainDockSpace]\nPos=0,25\nSize=1258,718\nCollapsed=0\n\n[Window][Canvas]\nPos=347,25\nSize=716,718\nCollapsed=0\n\n[Window][Properties]\nPos=0,25\nSize=345,718\nCollapsed=0\n\n[Window][Other]\nPos=1065,25\nSize=193,718\nCollapsed=0\n\n[Docking][Data]\nDockSpace ID=0xC3C5E3D9 Window=0xDEDC5B90 Pos=111,170 Size=1258,718 CentralNode=1 Selected=0x1C33C293\n\n";
+        static char const* layout_2 = "[Window][Debug##Default]\nPos=60,60\nSize=400,400\nCollapsed=0\n\n[Window][Hello, world!]\nPos=163,257\nSize=890,338\nCollapsed=0\nDockId=0xC3C5E3D9,0\n\n[Window][Dear ImGui Demo]\nPos=628,44\nSize=550,680\nCollapsed=0\n\n[Window][Settings]\nPos=0,25\nSize=1258,718\nCollapsed=0\nDockId=0xC3C5E3D9,0\n\n[Window][Another Window]\nPos=60,60\nSize=289,89\nCollapsed=0\n\n[Window][MainDockSpace]\nPos=0,25\nSize=1258,718\nCollapsed=0\n\n[Window][Canvas]\nPos=346,25\nSize=717,718\nCollapsed=0\nDockId=0x00000002,0\n\n[Window][Properties]\nPos=0,25\nSize=344,718\nCollapsed=0\nDockId=0x00000001,0\n\n[Window][Other]\nPos=1065,25\nSize=193,718\nCollapsed=0\nDockId=0x00000004,0\n\n[Docking][Data]\nDockSpace     ID=0xC3C5E3D9 Window=0xDEDC5B90 Pos=111,170 Size=1258,718 Split=X Selected=0xA233692E\n  DockNode    ID=0x00000003 Parent=0xC3C5E3D9 SizeRef=1063,718 Split=X\n    DockNode  ID=0x00000001 Parent=0x00000003 SizeRef=344,718 Selected=0xC89E3217\n    DockNode  ID=0x00000002 Parent=0x00000003 SizeRef=912,718 CentralNode=1 Selected=0xA233692E\n  DockNode    ID=0x00000004 Parent=0xC3C5E3D9 SizeRef=193,718 Selected=0x18991A24\n\n";
+
+        if (next_settings == 0)
+        {
+            next_settings = 0;
+            settings_window = true;
+            properties_window = false;
+            canvas_window = false;
+            other_window = false;
+            show_demo_window = show_another_window = show_simple_window = false;
+            ImGui::LoadIniSettingsFromMemory(layout_1);
+        }
+        if (next_settings == 1)
+        {
+            next_settings = 1;
+
+            settings_window = false;
+            properties_window = true;
+            canvas_window = true;
+            other_window = true;
+            show_demo_window = show_another_window = show_simple_window = false;
+            ImGui::LoadIniSettingsFromMemory(layout_2);
+        }
+        next_settings = -1;
+    }
+}
+
 // Main code
 int main(int, char**)
 {
@@ -94,8 +245,6 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
     // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -115,36 +264,42 @@ int main(int, char**)
             continue;
         }
 
+        apply_settings();
+
         // Start the Dear ImGui frame
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
+
+        docking_crash_example();
 
         // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+        if (show_simple_window)
         {
             static float f = 0.0f;
             static int counter = 0;
 
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+            if (ImGui::Begin("Hello, world!", &show_simple_window))     // Create a window called "Hello, world!" and append into it.
+            {
+                ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+                ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+                ImGui::Checkbox("Another Window", &show_another_window);
 
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
+                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+                ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+                if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+                    counter++;
+                ImGui::SameLine();
+                ImGui::Text("counter = %d", counter);
 
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+                ImGui::End();
+            }
         }
 
         // 3. Show another simple window.
@@ -156,6 +311,8 @@ int main(int, char**)
                 show_another_window = false;
             ImGui::End();
         }
+
+        
 
         // Rendering
         ImGui::Render();
