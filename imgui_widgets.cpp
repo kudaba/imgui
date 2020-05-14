@@ -3284,15 +3284,115 @@ static void    STB_TEXTEDIT_LAYOUTROW(StbTexteditRow* r, STB_TEXTEDIT_STRING* ob
     r->num_chars = (int)(text_remaining - (text + line_start_idx));
 }
 
-static bool is_separator(unsigned int c)                                        { return ImCharIsBlankW(c) || c==',' || c==';' || c=='(' || c==')' || c=='{' || c=='}' || c=='[' || c==']' || c=='|'; }
-static int  is_word_boundary_from_right(STB_TEXTEDIT_STRING* obj, int idx)      { return idx > 0 ? (is_separator( obj->TextW[idx-1] ) && !is_separator( obj->TextW[idx] ) ) : 1; }
-static int  STB_TEXTEDIT_MOVEWORDLEFT_IMPL(STB_TEXTEDIT_STRING* obj, int idx)   { idx--; while (idx >= 0 && !is_word_boundary_from_right(obj, idx)) idx--; return idx < 0 ? 0 : idx; }
-#ifdef __APPLE__    // FIXME: Move setting to IO structure
-static int  is_word_boundary_from_left(STB_TEXTEDIT_STRING* obj, int idx)       { return idx > 0 ? (!is_separator( obj->TextW[idx-1] ) && is_separator( obj->TextW[idx] ) ) : 1; }
-static int  STB_TEXTEDIT_MOVEWORDRIGHT_IMPL(STB_TEXTEDIT_STRING* obj, int idx)  { idx++; int len = obj->CurLenW; while (idx < len && !is_word_boundary_from_left(obj, idx)) idx++; return idx > len ? len : idx; }
-#else
-static int  STB_TEXTEDIT_MOVEWORDRIGHT_IMPL(STB_TEXTEDIT_STRING* obj, int idx)  { idx++; int len = obj->CurLenW; while (idx < len && !is_word_boundary_from_right(obj, idx)) idx++; return idx > len ? len : idx; }
-#endif
+static bool is_character(unsigned int c) { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= 128 && c != 0x3000); }
+static bool is_separator(unsigned int c) { return !is_character(c) && !ImCharIsBlankW(c) && c != '\n'; }
+
+// After researching different text editing applications there seems to be two main modes
+// 1. User programs (office tools, web browsers, etc)
+// 2. Developer programes (IDEs, code editors, etc)
+//
+// Keyboard navigation: Most IDEs will single step separator characters (with exceptions per language, i.e. c++ will double step -> and ::, etc), where User programs will step over all separators as a set.
+// Additionally navigating backwards over spaces will put you on the previous line for non-IDE mode, but keep you on the same line for IDE mode.
+// Mouse navigation: IDEs tend to not include the spaces after a word where user programs do.
+
+static bool word_selection_mode_ide;
+static bool word_selection_from_mouse;
+static int  STB_TEXTEDIT_MOVEWORDLEFT_IMPL( STB_TEXTEDIT_STRING* obj, int idx)
+{
+    if (word_selection_from_mouse)
+    {
+        // If cursor is at the start, end or middle of a word, move to start of word
+        // If it's in the middle of multiple spaces move to start of spaces
+        // If it's on a separator, leave it as is
+        if (ImCharIsBlankW(obj->TextW[idx]))
+        {
+            if (idx > 0 && (ImCharIsBlankW(obj->TextW[idx - 1]) || obj->TextW[idx - 1] == '\n'))
+            {
+                while (idx > 0 && ImCharIsBlankW(obj->TextW[idx - 1])) idx--;
+                return idx;
+            }
+            else
+                idx--;
+        }
+
+        if (is_separator(obj->TextW[idx]) && word_selection_mode_ide)
+            return idx;
+    }
+    else
+    {
+        // For normal move word left we simply skip white space, then move one then continue to start of word
+        if (idx > 0 && ImCharIsBlankW(obj->TextW[idx - 1]))
+        {
+            while (idx > 0 && ImCharIsBlankW(obj->TextW[idx - 1])) idx--;
+
+            // Special case, only skip character after skipping spaces if it's not a new-line
+            if (idx > 0 && obj->TextW[idx - 1] != '\n')
+                idx--;
+        }
+        else
+        {
+            idx--;
+        }
+
+        if (idx > 0 && obj->TextW[idx] == '\n')
+            idx--;
+    }
+
+    // In ide mode we only skip word characters only, in non-ide mode then we skip separators if current is separator, and characters if current is character
+    if (idx > 0)
+    {
+        if (is_character(obj->TextW[idx]))
+        {
+            while (idx > 0 && is_character(obj->TextW[idx - 1])) idx--;
+        }
+        else if (!word_selection_mode_ide && is_separator(obj->TextW[idx]))
+        {
+            while (idx > 0 && is_separator(obj->TextW[idx - 1])) idx--;
+        }
+    }
+
+    return idx < 0 ? 0 : idx;
+}
+static int  STB_TEXTEDIT_MOVEWORDRIGHT_IMPL(STB_TEXTEDIT_STRING* obj, int idx)
+{
+    const int len = obj->CurLenW;
+
+    if (word_selection_from_mouse)
+    {
+        // If we start on a space then select all space to the right
+        // If we start on a non-word character we select just that one character
+        // Otherwise we select all word characters to the right
+        if (ImCharIsBlankW(obj->TextW[idx]))
+        {
+            while (idx < len && ImCharIsBlankW(obj->TextW[idx])) idx++;
+            return idx > len ? len : idx;
+        }
+    }
+
+    // In ide mode we only skip word characters, in non-ide mode then we skip separators if current is separator, and characters if current is character
+    const bool is_start_character = is_character(obj->TextW[idx]);
+    const bool is_start_separator = is_separator(obj->TextW[idx]);
+
+    // Select at least one character
+    idx++;
+
+    // In ide mode we only skip word characters only, in non-ide mode then we skip separators if current is separator, and characters if current is character
+    if (is_start_character)
+    {
+        while (idx < len && is_character(obj->TextW[idx])) idx++;
+    }
+    else if (!word_selection_mode_ide && is_start_separator)
+    {
+        while (idx < len && is_separator(obj->TextW[idx])) idx++;
+    }
+
+    // Include space when using keyboard or when using mouse and not in ide mode
+    if (!word_selection_from_mouse || !word_selection_mode_ide)
+        while (idx < len && ImCharIsBlankW(obj->TextW[idx])) idx++;
+
+    return idx > len ? len : idx;
+}
+
 #define STB_TEXTEDIT_MOVEWORDLEFT   STB_TEXTEDIT_MOVEWORDLEFT_IMPL    // They need to be #define for stb_textedit.h
 #define STB_TEXTEDIT_MOVEWORDRIGHT  STB_TEXTEDIT_MOVEWORDRIGHT_IMPL
 
@@ -3753,6 +3853,9 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         PushFont(password_font);
     }
 
+    const int behavior_flags = flags | io.DefaultInputTextBehaviorsFlags;
+    ImStb::word_selection_mode_ide = (behavior_flags & ImGuiInputTextFlags_SelectBehaviorIDE) != 0;
+
     // Process mouse inputs and character inputs
     int backup_current_text_length = 0;
     if (g.ActiveId == id)
@@ -3773,19 +3876,35 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         const float mouse_x = (io.MousePos.x - frame_bb.Min.x - style.FramePadding.x) + state->ScrollX;
         const float mouse_y = (is_multiline ? (io.MousePos.y - draw_window->DC.CursorPos.y - style.FramePadding.y) : (g.FontSize*0.5f));
 
-        const bool is_osx = io.ConfigMacOSXBehaviors;
-        if (select_all || (hovered && !is_osx && io.MouseMultiClickCount[0] == 2))
+        const bool double_click_select_all = (behavior_flags & ImGuiInputTextFlags_DoubleClickSelectAll) != 0;
+        const bool quad_click_select_all = (behavior_flags & ImGuiInputTextFlags_QuadClickSelectAll) != 0;
+        if (select_all || (hovered && double_click_select_all && io.MouseMultiClickCount[0] == 2))
         {
             state->SelectAll();
             state->SelectedAllMouseLock = true;
         }
-        else if (hovered && is_osx && io.MouseMultiClickCount[0] == 2)
+        else if (hovered && !double_click_select_all && io.MouseMultiClickCount[0] == 2)
         {
-            // Double-click select a word only, OS X style (by simulating keystrokes)
+            // Double-click select a word only (by simulating keystrokes)
+            ImStb::word_selection_from_mouse = true;
             state->OnKeyPressed(STB_TEXTEDIT_K_WORDLEFT);
             state->OnKeyPressed(STB_TEXTEDIT_K_WORDRIGHT | STB_TEXTEDIT_K_SHIFT);
+            ImStb::word_selection_from_mouse = false;
         }
-        else if (io.MouseClicked[0] && !state->SelectedAllMouseLock)
+        else if (hovered && !double_click_select_all && io.MouseMultiClickCount[0] == 3)
+        {
+            // Triple-click select whole line (by simulating keystrokes)
+            state->OnKeyPressed(STB_TEXTEDIT_K_LINESTART);
+            state->OnKeyPressed(STB_TEXTEDIT_K_LINEEND | STB_TEXTEDIT_K_SHIFT);
+            state->OnKeyPressed(STB_TEXTEDIT_K_RIGHT | STB_TEXTEDIT_K_SHIFT);
+        }
+        else if (hovered && !double_click_select_all && quad_click_select_all && io.MouseMultiClickCount[0] == 4)
+        {
+            // Quadruple-click select all
+            state->SelectAll();
+            state->SelectedAllMouseLock = true;
+        }
+        else if (io.MouseMultiClickCount[0] == 1 && !state->SelectedAllMouseLock)
         {
             if (hovered)
             {
@@ -3804,6 +3923,7 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
 
         // It is ill-defined whether the back-end needs to send a \t character when pressing the TAB keys.
         // Win32 and GLFW naturally do it but not SDL.
+        const bool is_osx = io.ConfigMacOSXBehaviors;
         const bool ignore_char_inputs = (io.KeyCtrl && !io.KeyAlt) || (is_osx && io.KeySuper);
         if ((flags & ImGuiInputTextFlags_AllowTabInput) && IsKeyPressedMap(ImGuiKey_Tab) && !ignore_char_inputs && !io.KeyShift && !is_readonly)
             if (!io.InputCurrentFrame->InputQueueCharacters.contains('\t'))
@@ -3953,6 +4073,8 @@ bool ImGui::InputTextEx(const char* label, const char* hint, char* buf, int buf_
         // Update render selection flag after events have been handled, so selection highlight can be displayed during the same frame.
         render_selection |= state->HasSelection() && (RENDER_SELECTION_WHEN_INACTIVE || render_cursor);
     }
+
+    ImStb::word_selection_mode_ide = false;
 
     // Process callbacks and apply result back to user's buffer.
     if (g.ActiveId == id)

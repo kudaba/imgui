@@ -879,9 +879,13 @@ enum ImGuiInputTextFlags_
     ImGuiInputTextFlags_NoUndoRedo          = 1 << 16,  // Disable undo/redo. Note that input text owns the text data while active, if you want to provide your own undo/redo stack you need e.g. to call ClearActiveID().
     ImGuiInputTextFlags_CharsScientific     = 1 << 17,  // Allow 0123456789.+-*/eE (Scientific notation input)
     ImGuiInputTextFlags_CallbackResize      = 1 << 18,  // Callback on buffer capacity changes request (beyond 'buf_size' parameter value), allowing the string to grow. Notify when the string wants to be resized (for string types which hold a cache of their Size). You will be provided a new BufSize in the callback and NEED to honor it. (see misc/cpp/imgui_stdlib.h for an example of using this)
+    ImGuiInputTextFlags_DoubleClickSelectAll= 1 << 19,  // Configure Double click action to select all instead of select word. Disables triple/quad click.
+    ImGuiInputTextFlags_QuadClickSelectAll  = 1 << 20,  // Configure Quadruple click action to select all instead of select word.
+    ImGuiInputTextFlags_SelectBehaviorIDE   = 1 << 21,  // Change selection to behave like a code editor IDE (default behavior is text editor, see comments in imgui_widgets.cpp for more info)
+
     // [Internal]
-    ImGuiInputTextFlags_Multiline           = 1 << 20,  // For internal use by InputTextMultiline()
-    ImGuiInputTextFlags_NoMarkEdited        = 1 << 21   // For internal use by functions using InputText() before reformatting data
+    ImGuiInputTextFlags_Multiline           = 1 << 30,  // For internal use by InputTextMultiline()
+    ImGuiInputTextFlags_NoMarkEdited        = 1 << 31   // For internal use by functions using InputText() before reformatting data
 };
 
 // Flags for ImGui::TreeNodeEx(), ImGui::CollapsingHeader*()
@@ -1542,6 +1546,7 @@ struct ImGuiIO
     bool        ConfigWindowsResizeFromEdges;   // = true           // Enable resizing of windows from their edges and from the lower-left corner. This requires (io.BackendFlags & ImGuiBackendFlags_HasMouseCursors) because it needs mouse cursor feedback. (This used to be a per-window ImGuiWindowFlags_ResizeFromAnySide flag)
     bool        ConfigWindowsMoveFromTitleBarOnly; // = false       // [BETA] Set to true to only allow moving windows when clicked+dragged from the title bar. Windows without a title bar are not affected.
     float       ConfigWindowsMemoryCompactTimer;// = 60.0f          // [BETA] Compact window memory usage when unused. Set to -1.0f to disable.
+    int         DefaultInputTextBehaviorsFlags; // = 0              // Set default flags to configure input text behavior at a global level. Only applies to ImGuiInputTextFlags_DoubleClickSelectAll, ImGuiInputTextFlags_QuadClickSelectAll and ImGuiInputTextFlags_SelectBehaviorIDE
 
     //------------------------------------------------------------------
     // Platform Functions

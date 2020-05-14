@@ -1204,7 +1204,18 @@ static void ShowDemoWindowWidgets()
             ImGui::CheckboxFlags("ImGuiInputTextFlags_ReadOnly", (unsigned int*)&flags, ImGuiInputTextFlags_ReadOnly);
             ImGui::CheckboxFlags("ImGuiInputTextFlags_AllowTabInput", (unsigned int*)&flags, ImGuiInputTextFlags_AllowTabInput);
             ImGui::CheckboxFlags("ImGuiInputTextFlags_CtrlEnterForNewLine", (unsigned int*)&flags, ImGuiInputTextFlags_CtrlEnterForNewLine);
+            ImGui::CheckboxFlags("ImGuiInputTextFlags_DoubleClickSelectAll", (unsigned int*)&flags, ImGuiInputTextFlags_DoubleClickSelectAll);
+            ImGui::CheckboxFlags("ImGuiInputTextFlags_QuadClickSelectAll", (unsigned int*)&flags, ImGuiInputTextFlags_QuadClickSelectAll);
+            ImGui::CheckboxFlags("ImGuiInputTextFlags_SelectBehaviorIDE", (unsigned int*)&flags, ImGuiInputTextFlags_SelectBehaviorIDE);
+
+            // Store and reset global flags so demo acts as expected regardless of user options.
+            int global_flags = ImGui::GetIO().DefaultInputTextBehaviorsFlags;
+            ImGui::GetIO().DefaultInputTextBehaviorsFlags = 0;
+
             ImGui::InputTextMultiline("##source", text, IM_ARRAYSIZE(text), ImVec2(-FLT_MIN, ImGui::GetTextLineHeight() * 16), flags);
+
+            ImGui::GetIO().DefaultInputTextBehaviorsFlags = global_flags;
+
             ImGui::TreePop();
         }
 
